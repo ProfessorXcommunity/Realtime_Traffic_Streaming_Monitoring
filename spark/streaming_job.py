@@ -1,6 +1,7 @@
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
+import time
 
 spark = SparkSession.builder \
     .appName("RealTimeTraffic") \
@@ -16,11 +17,16 @@ schema = StructType([
     StructField("status_code", IntegerType())
 ])
 
+# Wait for Kafka to be ready
+time.sleep(10)
+
 raw_df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", "kafka:9092") \
     .option("subscribe", "web_events") \
-    .option("startingOffsets", "latest") \
+    .option("startingOffsets", "earliest") \
+    .option("failOnDataLoss", "false") \
+    .option("kafka.session.timeout.ms", "30000") \
     .load()
 
 events_df = raw_df \
@@ -50,21 +56,27 @@ result_df = agg_df.select(
 
 def write_to_postgres(df, batch_id):
     if df.rdd.isEmpty():
+        print(f"Batch {batch_id} is empty, skipping write")
         return
 
-    df.write \
-        .format("jdbc") \
-        .option("url", "jdbc:postgresql://postgres:5432/traffic") \
-        .option("dbtable", "traffic_metrics") \
-        .option("user", "postgres") \
-        .option("password", "postgres") \
-        .mode("append") \
-        .save()
+    try:
+        df.write \
+            .format("jdbc") \
+            .option("url", "jdbc:postgresql://postgres:5432/traffic") \
+            .option("dbtable", "traffic_metrics") \
+            .option("user", "postgres") \
+            .option("password", "postgres") \
+            .mode("append") \
+            .save()
+        print(f"Successfully wrote batch {batch_id} to PostgreSQL")
+    except Exception as e:
+        print(f"Error writing batch {batch_id}: {e}")
 
 query = result_df.writeStream \
     .outputMode("append") \
-    .option("checkpointLocation", "/tmp/checkpoints/traffic") \
+    .option("checkpointLocation", "/tmp/checkpoints/traffic_v1") \
     .foreachBatch(write_to_postgres) \
     .start()
 
+print("Streaming query started successfully")
 query.awaitTermination()
