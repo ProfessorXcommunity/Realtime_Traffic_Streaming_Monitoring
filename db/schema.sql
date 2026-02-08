@@ -4,5 +4,5 @@ CREATE TABLE IF NOT EXISTS traffic_metrics(
     error_rate DOUBLE PRECISION,
     avg_response_time DOUBLE PRECISION,
     unique_users INTEGER,
-    is_anomoly BOOLEAN
+    is_anomaly BOOLEAN
 )
