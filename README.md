@@ -67,17 +67,17 @@ realtime-traffic-pipeline/
 
 # Running the Project
 ## Start all services
-```
+```code
 docker-compose up --build
 ```
 
 ## Run the Producer
-```
+```code
 cd producer
 node event_generator.js
 ```
 ## Stopping the pipeline
-```
+```code
 docker-compose down -v
 ```
 
@@ -88,3 +88,7 @@ docker-compose down -v
 | Kafka connection errors   | Verify `advertised.listeners`         |
 | Spark restarts repeatedly | Check memory availability             |
 | JDBC write failures       | Verify schema and JDBC driver         |
+
+# Grafana Monitoring
+<img width="1917" height="796" alt="Screenshot 2026-02-09 at 12 29 10 PM" src="https://github.com/user-attachments/assets/71f209f5-5ad4-46ab-97fb-3ac9429fa90d" />
+
