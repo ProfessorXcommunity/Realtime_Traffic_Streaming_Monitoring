@@ -27,6 +27,6 @@ get_producer()
 @app.post("/event")
 def ingest_event(event: dict):
     event['event_id'] = str(uuid.uuid4())
-    event['timestamp'] = datetime.utcnow().isoformat()
+    event['timestamp'] = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     producer.send('web_events',event)
     return {"status" : "ok"}

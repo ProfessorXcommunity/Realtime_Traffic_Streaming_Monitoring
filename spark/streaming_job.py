@@ -60,12 +60,12 @@ events_df = raw_df \
     .selectExpr("CAST(value AS STRING)") \
     .select(from_json(col("value"), schema).alias("data")) \
     .select("data.*") \
-    .withColumn("timestamp", to_timestamp("timestamp", "yyyy-MM-dd'T'HH:mm:ssX")) \
+    .withColumn("timestamp", to_timestamp("timestamp", "yyyy-MM-dd'T'HH:mm:ss'Z'")) \
     .filter(col('timestamp').isNotNull())
 
 agg_df = events_df \
-    .withWatermark("timestamp", "2 minutes") \
-    .groupBy(window(col("timestamp"), "1 minute")) \
+    .withWatermark("timestamp", "5 seconds") \
+    .groupBy(window(col("timestamp"), "10 seconds")) \
     .agg(
         count("*").alias("requests_per_min"),
         avg("response_time_ms").alias("avg_response_time"),
@@ -84,11 +84,17 @@ result_df = agg_df.select(
 
 def write_to_postgres(df, batch_id):
 
-    # print("\n==============================")
-    # print(f"FOREACH BATCH CALLED → batch_id={batch_id}")
-    # print(f"Row count in batch = {df.count()}")
-    # df.show(truncate=False)
-    # print("==============================\n")
+    print("\n==============================")
+    print(f"FOREACH BATCH CALLED → batch_id={batch_id}")
+    print(f"Row count in batch = {df.count()}")
+    if df.count() > 0:
+        print("Schema:")
+        df.printSchema()
+        print("Data:")
+        df.show(truncate=False)
+    else:
+        print("⚠️  WARNING: Empty batch!")
+    print("==============================\n")
 
     if df.isEmpty():
         print(f"Batch {batch_id} is empty, skipping write")
@@ -102,14 +108,14 @@ def write_to_postgres(df, batch_id):
             .option("user", "postgres") \
             .option("password", "postgres") \
             .option('driver','org.postgresql.Driver')\
-            .mode("overwrite") \
+            .mode("append") \
             .save()
         print(f"Successfully wrote batch {batch_id} to PostgreSQL")
     except Exception as e:
         print(f"Error writing batch {batch_id}: {e}")
 
 query = result_df.writeStream \
-    .outputMode("complete") \
+    .outputMode("append") \
     .option("checkpointLocation", "/tmp/checkpoints/traffic_v3") \
     .foreachBatch(write_to_postgres) \
     .start()
